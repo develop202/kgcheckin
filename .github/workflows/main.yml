@@ -9,11 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
       - name: 创建node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 24
           cache: 'npm'
           cache-dependency-path: ./api/package-lock.json
       - name: 🔧 安装GitHub CLI，并使用PAT登录
@@ -32,7 +32,7 @@ jobs:
           fi
       - name: Cache node_modules in api directory
         id: cache-npm
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: ./api/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('./api/package-lock.json') }}
