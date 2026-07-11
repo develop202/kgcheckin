@@ -67,6 +67,12 @@ jobs:
           USERINFO: ${{ secrets.USERINFO }}
           APPEND_USER: ${{ github.event.inputs.append_user }}
           ALLOW_PRINT_USERINFO: ${{ github.event.inputs.print_userinfo }}
+      - name: 写入二维码到运行摘要
+        if: always()
+        run: |
+          if [ -f qr-summary.md ]; then
+            cat qr-summary.md >> $GITHUB_STEP_SUMMARY
+          fi
       - name: 上传二维码图片
         if: always()
         uses: actions/upload-artifact@v4

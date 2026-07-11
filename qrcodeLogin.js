@@ -15,7 +15,7 @@ const QRCode = require('./api/node_modules/qrcode')
  * @returns {string} ASCII 二维码文本
  */
 function renderQrAscii(url) {
-  const qr = QRCode.create(url, { margin: 1 })
+  const qr = QRCode.create(url, { margin: 2 })
   const modules = qr.modules
   const size = modules.size
   let ascii = ''
@@ -31,45 +31,55 @@ function renderQrAscii(url) {
 
 /**
  * 显示二维码
- * - GitHub Actions: 写入 Step Summary（ASCII 渲染） + 保存 PNG 供 artifact 下载
- * - 本地终端: 直接输出 ASCII + 链接
+ * - 日志: 直接输出 ASCII 二维码（纯 Unicode，无 ANSI 码）
+ * - Summary: 写入 qr-summary.md，供 workflow 在 step 结束后写入 $GITHUB_STEP_SUMMARY
+ * - PNG: 保存为文件供 artifact 下载
  * @param {string} url - 需要编码为二维码的 URL
+ * @param {number} index - 当前是第几个二维码（从1开始）
+ * @param {number} total - 总共需要登录几个账号
  */
-async function displayQrcode(url) {
+async function displayQrcode(url, index, total) {
   const ascii = renderQrAscii(url)
 
-  // 保存 PNG 文件，供 workflow 上传为 artifact
+  // 1. 输出到日志（实时可见，用户可在此扫码）
+  const header = total > 1 ? `（第 ${index}/${total} 个账号）` : ''
+  printMagenta(`\n请使用酷狗音乐 APP 扫描下方二维码登录${header}`)
+  console.log(ascii)
+  printMagenta('如二维码无法扫描，请复制此链接到浏览器打开扫码：')
+  console.log(url)
+  console.log('')
+
+  // 2. 保存 PNG 文件，供 workflow 上传为 artifact
   try {
     await QRCode.toFile('./qr-code.png', url, { width: 256, margin: 2 })
   } catch {
     // PNG 保存失败不影响主流程
   }
 
-  const stepSummary = process.env.GITHUB_STEP_SUMMARY
-  if (stepSummary) {
-    const content = [
-      '## 🎵 酷狗音乐扫码登录',
-      '',
-      '请使用 **酷狗音乐 APP** 扫描下方二维码登录',
-      '',
-      '```',
-      ascii,
-      '```',
-      '',
-      '> 如上方二维码无法扫描，可在下方 **Artifacts** 区域下载 `qr-code.png` 高清图片',
-      '',
-      '或复制此链接到浏览器打开扫码：',
-      '',
-      url,
-      '',
-    ].join('\n')
-    fs.appendFileSync(stepSummary, content)
-    printGreen('二维码已写入运行摘要页面（Summary）')
-  } else {
-    // 本地运行：直接输出到终端
-    console.log(ascii)
-    printMagenta('请复制此链接到浏览器打开，使用酷狗音乐 APP 扫码登录：')
-    console.log(url)
+  // 3. 写入 Markdown 文件，供 workflow 在 step 结束后写入 $GITHUB_STEP_SUMMARY
+  const md = [
+    `## 🎵 酷狗音乐扫码登录${header}`,
+    '',
+    '请使用 **酷狗音乐 APP** 扫描下方二维码登录',
+    '',
+    '```',
+    ascii,
+    '```',
+    '',
+    `或复制此链接到浏览器打开扫码：`,
+    '',
+    url,
+    '',
+  ].join('\n')
+
+  try {
+    if (index === 1) {
+      fs.writeFileSync('./qr-summary.md', md)
+    } else {
+      fs.appendFileSync('./qr-summary.md', '\n---\n\n' + md)
+    }
+  } catch {
+    // 文件写入失败不影响主流程
   }
 }
 
@@ -91,7 +101,7 @@ async function qrcode() {
       if (result.status === 1) {
         qrcode = result.data.qrcode
         const qrUrl = `https://h5.kugou.com/apps/loginQRCode/html/index.html?qrcode=${qrcode}`
-        await displayQrcode(qrUrl)
+        await displayQrcode(qrUrl, n + 1, number)
       } else {
         printRed("响应内容")
         console.dir(summarizeResponse(result), { depth: null })
