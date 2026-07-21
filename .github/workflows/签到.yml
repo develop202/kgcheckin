@@ -2,7 +2,7 @@ name: 签到
 on:
   workflow_dispatch:
   schedule:
-    - cron: '10 17 * * *'
+    - cron: '0 0 * * *'
 permissions:
   contents: read
 jobs:
