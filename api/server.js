@@ -243,7 +243,17 @@ async function consturctServer(moduleDefs) {
 
       const { cookie, ...params } = req.query;
 
-      const query = Object.assign({}, { cookie: Object.assign(req.cookies, cookie) }, params, { body: req.body });
+      // 将 query.cookie 规整为对象后再合并：字符串走 cookieToJson，对象原样，其余视为空；
+      // 同时用新对象合并，避免直接 mutate req.cookies 以及字符串/数组直接 Object.assign 导致的键污染
+      const cookieSource = typeof cookie === 'string'
+        ? cookieToJson(cookie)
+        : (cookie && !Array.isArray(cookie) && typeof cookie === 'object' ? cookie : {});
+      const query = Object.assign(
+        {},
+        { cookie: Object.assign({}, req.cookies, cookieSource) },
+        params,
+        { body: req.body }
+      );
 
       const authHeader = req.headers['authorization'];
       if (authHeader) {

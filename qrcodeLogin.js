@@ -6,7 +6,13 @@ import { summarizeResponse } from "./utils/safeLog.js";
 import { upsertUser, saveUserinfo } from "./utils/userinfo.js";
 
 const require = createRequire(import.meta.url)
-const QRCode = require('./api/node_modules/qrcode')
+// 优先从常规 node_modules 解析（本地/全局安装场景），失败再回退到 Actions 构建产物中的 api/node_modules 硬编码路径
+let QRCode
+try {
+  QRCode = require('qrcode')
+} catch {
+  QRCode = require('./api/node_modules/qrcode')
+}
 
 // GitHub Actions 运行环境下自动注入的 Step Summary 文件路径
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY || ''

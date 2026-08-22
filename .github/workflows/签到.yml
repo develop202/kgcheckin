@@ -5,6 +5,7 @@ on:
     - cron: '10 17 * * *'
 permissions:
   contents: read
+  actions: write
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -18,16 +19,6 @@ jobs:
           node-version: 24
           cache: 'npm'
           cache-dependency-path: ./api/package-lock.json
-      - name: 检查 GitHub CLI
-        run: |
-          if ! command -v gh >/dev/null 2>&1; then
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            sudo apt update
-            sudo apt install gh -y
-          fi
-          gh --version
       - name: 缓存依赖
         id: cache-npm
         uses: actions/cache@v4
