@@ -37,6 +37,28 @@ const SENSITIVE_BODY_KEYS = new Set([
   'password',
 ]);
 
+// 可能触发原型污染（prototype pollution）的保留键，用户可控输入中若出现需剔除
+const RESERVED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+/**
+ * 递归剔除可能触发原型污染的保留键，避免用户可控的 query/body 经 Object.assign 注入 __proto__ 等属性。
+ * @param {any} value
+ * @returns {any}
+ */
+function dropReservedKeys(value) {
+  if (Array.isArray(value)) {
+    return value.map(dropReservedKeys);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([k]) => !RESERVED_KEYS.has(k))
+        .map(([k, v]) => [k, dropReservedKeys(v)])
+    );
+  }
+  return value;
+}
+
 function maskIdentifierForLog(value) {
   const chars = Array.from(String(value ?? ''));
 
@@ -188,13 +210,18 @@ async function consturctServer(moduleDefs) {
 
   // Cookie Parser
   app.use((req, _, next) => {
-    req.cookies = {};
+    req.cookies = Object.create(null);
     (req.headers.cookie || '').split(/;\s+|(?<!\s)\s+$/g).forEach((pair) => {
       const crack = pair.indexOf('=');
       if (crack < 1 || crack === pair.length - 1) {
         return;
       }
-      req.cookies[decode(pair.slice(0, crack)).trim()] = decode(pair.slice(crack + 1)).trim();
+      const key = decode(pair.slice(0, crack)).trim();
+      // 跳过可能触发原型污染的保留键，避免通过 Cookie 头篡改 Object.prototype
+      if (RESERVED_KEYS.has(key)) {
+        return;
+      }
+      req.cookies[key] = decode(pair.slice(crack + 1)).trim();
     });
     next();
   });
@@ -242,6 +269,7 @@ async function consturctServer(moduleDefs) {
       });
 
       const { cookie, ...params } = req.query;
+      const safeParams = dropReservedKeys(params);
 
       // 将 query.cookie 规整为对象后再合并：字符串走 cookieToJson，对象原样，其余视为空；
       // 同时用新对象合并，避免直接 mutate req.cookies 以及字符串/数组直接 Object.assign 导致的键污染
@@ -251,7 +279,7 @@ async function consturctServer(moduleDefs) {
       const query = Object.assign(
         {},
         { cookie: Object.assign({}, req.cookies, cookieSource) },
-        params,
+        safeParams,
         { body: req.body }
       );
 
