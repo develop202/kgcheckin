@@ -1,7 +1,10 @@
 const config = require('./config.json');
 const { apiver, appid, wx_appid, wx_lite_appid, srcappid, clientver, liteAppid, liteClientver } = config;
-const wx_secret = process.env.KUGOU_WX_SECRET || config.wx_secret;
-const wx_lite_secret = process.env.KUGOU_WX_LITE_SECRET || config.wx_lite_secret;
+// 微信密钥仅从环境变量注入，不再写入仓库（config.json 已移除明文）。
+// 本地开发：在 api/.env 中配置 KUGOU_WX_SECRET / KUGOU_WX_LITE_SECRET；
+// GitHub Actions：在仓库 Secrets 中配置同名变量并由 workflow 注入。
+const wx_secret = process.env.KUGOU_WX_SECRET;
+const wx_lite_secret = process.env.KUGOU_WX_LITE_SECRET;
 const {
   cryptoAesDecrypt,
   cryptoAesEncrypt,
