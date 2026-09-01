@@ -31,10 +31,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: 创建 Node 环境
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: 'npm'
@@ -51,18 +51,8 @@ jobs:
           fi
           gh --version
 
-      - name: 缓存依赖
-        id: cache-npm
-        uses: actions/cache@v4
-        with:
-          path: ./api/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('./api/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
       - name: 安装依赖
         run: npm run install
-        if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
 
       # ════════════════════════════════════════════
       #   步骤一：生成二维码 → PNG + Summary + HTML 登录页
