@@ -59,7 +59,15 @@ async function sendDingTalk(title, content, key, secret) {
       markdown: { title, text: `### ${title}\n\n${content}` },
     }),
   })
-  return resp.ok
+  // 钉钉接口即使 HTTP 200 也可能业务失败（errcode != 0），必须解析响应体，
+  // 否则关键词不匹配 / 加签错误 / access_token 无效 / IP 白名单等都会被
+  // 误判为发送成功。失败时打印真实原因并返回 false。
+  const data = await resp.json().catch(() => null)
+  if (!data || data.errcode !== 0) {
+    printRed(`钉钉发送失败: ${data?.errmsg || `HTTP ${resp.status}`}`)
+    return false
+  }
+  return true
 }
 
 // 3. 飞书机器人

@@ -149,19 +149,19 @@ jobs:
           PAT: ${{ secrets.PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
-      # ═══ 清理：登录完成后立即删除本次 Release（不堆积）═══
-      - name: 清理本次二维码 Release
+      # ═══ 清理：登录完成后立即删除本次 Release 及同名 Tag（不堆积）═══
+      - name: 清理本次二维码 Release 及 Tag
         if: ${{ always() && steps.publish.outcome == 'success' }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="qr-${{ github.run_id }}"
-          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" -y 2>/dev/null \
-            && echo "✅ 已删除本次 Release: $TAG" || echo "⚠️ Release $TAG 不存在或已删除"
+          gh release delete "$TAG" --cleanup-tag --repo "$GITHUB_REPOSITORY" -y 2>/dev/null \
+            && echo "✅ 已删除本次 Release 及 Tag: $TAG" || echo "⚠️ Release/Tag $TAG 不存在或已删除"
 
       # ═══ 兜底：清理残留的旧二维码 Release（保留最近 3 个）═══
-      - name: 清理旧的二维码 Release
+      - name: 清理旧的二维码 Release 及 Tag
         if: ${{ always() }}
         continue-on-error: true
         env:
@@ -170,6 +170,6 @@ jobs:
           gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
             | awk '$1 ~ /^qr-/ {print $1}' | head -n -3 \
             | while read t; do
-                gh release delete "$t" --repo "$GITHUB_REPOSITORY" -y 2>/dev/null
-                echo "已删除旧 Release: $t"
+                gh release delete "$t" --cleanup-tag --repo "$GITHUB_REPOSITORY" -y 2>/dev/null
+                echo "已删除旧 Release 及 Tag: $t"
               done || true
