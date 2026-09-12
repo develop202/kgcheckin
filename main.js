@@ -56,7 +56,7 @@ async function main() {
             nickname: safeUserId,
             status: '失败',
             listen: '账号不存在',
-            vipClaim: '0/120',
+            vipClaim: '0/8',
             vipExpiry: '未知',
             error: 'token过期或账号不存在'
           })
@@ -102,14 +102,14 @@ async function main() {
         printYellow("开始领取VIP...")
         let claimCount = 0
         let claimTotal = 0
-        for (let i = 1; i <= 120; i++) {
+        for (let i = 1; i <= 8; i++) {
           // ad获取vip
           const ad = await send(`/youth/vip?timestrap=${Date.now()}`, "GET", headers)
           claimTotal = i
           if (ad.status === 1) {
             printGreen(`第${i}次领取成功`)
             claimCount++
-            if (i != 120) {
+            if (i != 8) {
               await delay(30 * 1000)
             }
           } else if (ad.error_code === 30002) {
@@ -151,7 +151,7 @@ async function main() {
           nickname: safeUserId,
           status: '失败',
           listen: '异常',
-          vipClaim: '0/120',
+          vipClaim: '0/8',
           vipExpiry: '未知',
           error: err && err.message ? err.message : String(err)
         })
