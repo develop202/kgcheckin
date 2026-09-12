@@ -56,7 +56,7 @@ async function main() {
             nickname: safeUserId,
             status: '失败',
             listen: '账号不存在',
-            vipClaim: '0/240',
+            vipClaim: '0/120',
             vipExpiry: '未知',
             error: 'token过期或账号不存在'
           })
@@ -151,7 +151,7 @@ async function main() {
           nickname: safeUserId,
           status: '失败',
           listen: '异常',
-          vipClaim: '0/240',
+          vipClaim: '0/120',
           vipExpiry: '未知',
           error: err && err.message ? err.message : String(err)
         })
