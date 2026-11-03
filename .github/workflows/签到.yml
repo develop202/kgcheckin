@@ -1,25 +1,25 @@
-名称: 签到
+name: 签到
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 0 * * *'
+    - cron: '10 17 * * *'
 permissions:
   contents: read
-操作: 编写
+  actions: write
 jobs:
-运行:
+  run:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - 名称: 检出仓库
+      - name: 检出仓库
         uses: actions/checkout@v4
-      - 名称: 创建 Node 环境
+      - name: 创建 Node 环境
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: 'npm'
           cache-dependency-path: ./api/package-lock.json
-      - 名称: 缓存依赖
+      - name: 缓存依赖
         id: cache-npm
         uses: actions/cache@v4
         with:
@@ -27,12 +27,12 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('./api/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
-      - 名称: 安装依赖
-      运行: npm run install
-      if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
-      - 名称: 执行签到
-      运行: npm run main
-    env:
+      - name: 安装依赖
+        run: npm run install
+        if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+      - name: 执行签到
+        run: npm run main
+        env:
           USERINFO: ${{ secrets.USERINFO }}
           PAT: ${{ secrets.PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
