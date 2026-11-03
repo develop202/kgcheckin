@@ -2,7 +2,7 @@
 on:
   workflow_dispatch:
   schedule:
-    - cron: '2 0 * * *'
+    - cron: '8 0* * *'
 permissions:
   contents: read
 操作: 编写
