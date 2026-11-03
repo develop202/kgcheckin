@@ -28,11 +28,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
       - 名称: 安装依赖
-运行: npm run install
-        if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+      运行: npm run install
+      if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
       - 名称: 执行签到
-运行: npm run main
-        env:
+      运行: npm run main
+    env:
           USERINFO: ${{ secrets.USERINFO }}
           PAT: ${{ secrets.PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
