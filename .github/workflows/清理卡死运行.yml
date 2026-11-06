@@ -1,0 +1,73 @@
+name: 清理卡死运行
+# 用途：手动触发一次，把工作流里所有 queued / in_progress 的运行
+#       用 force-cancel 强制取消（普通 cancel 失败时唯一有效的手段）。
+on:
+  workflow_dispatch:
+    inputs:
+      keep_id:
+        description: "不要取消的运行 ID（留空则不保留任何运行）"
+        required: false
+        default: ""
+permissions:
+  actions: write
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 强制取消排队/运行中的任务
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          KEEP_ID: ${{ github.event.inputs.keep_id }}
+        run: |
+          set -uo pipefail
+          echo "===== 清理前队列 ====="
+          gh run list --repo "$REPO" --limit 100 \
+            --json databaseId,name,status,conclusion,event,createdAt \
+            --jq '.[] | "\(.databaseId)  \(.status)  \(.conclusion // "-")  \(.event)  \(.name)  \(.createdAt)"'
+          ids=$(gh run list --repo "$REPO" --limit 100 \
+                  --json databaseId,status \
+                  --jq '.[] | select(.status=="queued" or .status=="in_progress" or .status=="requested" or .status=="pending" or .status=="waiting") | .databaseId')
+          if [ -z "$ids" ]; then
+            echo "✅ 没有排队中的运行，无需清理"
+            exit 0
+          fi
+          rc=0
+          for id in $ids; do
+            if [ -n "${KEEP_ID:-}" ] && [ "$id" = "$KEEP_ID" ]; then
+              echo "⏭  跳过保留的运行 $id"
+              continue
+            fi
+            echo "--- force-cancel $id"
+            if gh api -X POST "repos/$REPO/actions/runs/$id/force-cancel" --silent; then
+              echo "    ✅ 已强制取消 $id"
+            else
+              # force-cancel 也失败时，退一步尝试普通 cancel
+              echo "    ⚠️ force-cancel 失败，尝试普通 cancel"
+              gh api -X POST "repos/$REPO/actions/runs/$id/cancel" --silent \
+                && echo "    ✅ 已取消 $id" || { echo "    ❌ 仍失败（该 run 可能已终止，属于孤儿记录）"; rc=1; }
+            fi
+          done
+          echo "===== 清理后队列 ====="
+          gh run list --repo "$REPO" --limit 30 \
+            --json databaseId,name,status,conclusion,event \
+            --jq '.[] | "\(.databaseId)  \(.status)  \(.conclusion // "-")  \(.event)  \(.name)"'
+          exit $rc
+      - name: 删除已终止的孤儿运行（可选，省列表噪音）
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          # 只删 completed 且超过 7 天的记录，避免误删近期有用的历史
+          gh run list --repo "$REPO" --limit 200 --status completed \
+            --json databaseId,createdAt \
+            --jq '.[] | select((.createdAt | fromdateiso8601) < (now - 604800)) | .databaseId' \
+          | while read -r id; do
+              [ -z "$id" ] && continue
+              gh api -X DELETE "repos/$REPO/actions/runs/$id" --silent \
+                && echo "🗑  已删除 $id" || echo "⚠️ 删除失败 $id"
+            done || true
