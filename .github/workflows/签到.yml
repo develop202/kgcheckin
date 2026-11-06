@@ -3,6 +3,13 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '10 17 * * *'
+# ★ 关键修复：同一工作流同一分支只允许一个在跑。
+#   没有这段时，schedule 和手动触发会不断叠加排队，
+#   队列越堆越长，任务长时间停在 Queued，点取消还会报
+#   "Failed to cancel workflow"（because 该 run 已被后端摘出队列）。
+concurrency:
+  group: checkin-${{ github.ref }}
+  cancel-in-progress: false
 permissions:
   contents: read
   actions: write
