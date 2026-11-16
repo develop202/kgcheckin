@@ -1,25 +1,89 @@
 name: 签到
+
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: "忽略今日已完成标记，强制执行"
+        required: false
+        default: "false"
   schedule:
-    # 北京时间（东8区）凌晨 1:30 = UTC 17:30
+    # 主时段：北京时间 01:30 = UTC 17:30
     - cron: '30 17 * * *'
+    # 备用 1：北京 02:20 = UTC 18:20
+    - cron: '20 18 * * *'
+    # 备用 2：北京 03:40 = UTC 19:40
+    - cron: '40 19 * * *'
+    # 备用 3：北京 06:10 = UTC 22:10
+    - cron: '10 22 * * *'
+    # 备用 4：北京 09:50 = UTC 01:50
+    - cron: '50 1 * * *'
+
+# 排队不并行：备用时段的实例会等前一个跑完，然后看到「今日已完成」直接跳过
+concurrency:
+  group: kgcheckin-daily
+  cancel-in-progress: false
+
 permissions:
   contents: read
   actions: write
+
 jobs:
+  gate:
+    name: 判断今日是否需要执行
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      day: ${{ steps.d.outputs.day }}
+      should_run: ${{ steps.judge.outputs.should_run }}
+    steps:
+      - name: 计算北京日期
+        id: d
+        run: echo "day=$(TZ=Asia/Shanghai date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: 查询今日完成标记
+        id: done
+        uses: actions/cache/restore@v4
+        with:
+          path: .run-state
+          key: kg-done-${{ steps.d.outputs.day }}
+
+      - name: 结论
+        id: judge
+        run: |
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::手动指定 force=true，强制执行"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::手动触发，强制执行"
+          elif [ "${{ steps.done.outputs.cache-hit }}" = "true" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::今天（${{ steps.d.outputs.day }}）已签到成功过，本次是备用时段，跳过"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::今天（${{ steps.d.outputs.day }}）还没签到，开始执行"
+          fi
+
   run:
+    name: 执行签到
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
+        with:
+          show-progress: false
+
       - name: 创建 Node 环境
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: 'npm'
           cache-dependency-path: ./api/package-lock.json
+
       - name: 缓存依赖
         id: cache-npm
         uses: actions/cache@v4
@@ -28,10 +92,13 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('./api/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
       - name: 安装依赖
         run: npm run install
         if: ${{ steps.cache-npm.outputs.cache-hit != 'true' }}
+
       - name: 执行签到
+        id: sign
         run: npm run main
         env:
           USERINFO: ${{ secrets.USERINFO }}
@@ -56,3 +123,27 @@ jobs:
           MAIL_USER: ${{ secrets.MAIL_USER }}
           MAIL_PASS: ${{ secrets.MAIL_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+
+      - name: 写今日完成标记
+        if: success()
+        run: |
+          mkdir -p .run-state
+          echo "done at $(TZ=Asia/Shanghai date -Iseconds)" > .run-state/done
+
+      - name: 保存今日标记（后续备用时段看到就跳过）
+        if: success()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: .run-state
+          key: kg-done-${{ needs.gate.outputs.day }}
+
+      - name: 汇总
+        if: always()
+        run: |
+          {
+            echo "### 运行结束"
+            echo "- 触发方式：${{ github.event_name }}"
+            echo "- 北京日期：${{ needs.gate.outputs.day }}"
+            echo "- job 结论：${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
