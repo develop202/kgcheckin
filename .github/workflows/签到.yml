@@ -54,9 +54,6 @@ jobs:
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "::notice::手动指定 force=true，强制执行"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::手动触发，强制执行"
           elif [ "${{ steps.done.outputs.cache-hit }}" = "true" ]; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
             echo "::notice::今天（${{ steps.d.outputs.day }}）已签到成功过，本次是备用时段，跳过"
